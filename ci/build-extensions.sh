@@ -50,7 +50,11 @@ s,n=re.subn(r'(?m)^(Release:\s*)([^\n]+)',lambda m:m.group(1)+m.group(2)+'.cve20
 assert n==1
 open(sys.argv[2],'w').write(s)
 PY
-  yum-builddep -y --disablerepo='*' --enablerepo='build-*' --define 'rhel 7' --define 'dist .el7.remi' "$top/SPECS/candidate.spec"
+  if ! yum-builddep -y --disablerepo='*' --enablerepo='build-*' --define 'rhel 7' --define 'dist .el7.remi' --define '_with_tests 1' "$top/SPECS/candidate.spec"; then
+    echo "$name|DEPENDENCY_FAILURE" | tee -a result/extension-status.txt
+    overall=1
+    continue
+  fi
   # Package build and local synthetic test daemons run without root privileges.
   chown -R builder:builder "$top"
   set +e
