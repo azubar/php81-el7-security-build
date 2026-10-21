@@ -56,6 +56,7 @@ jobs:
           mkdir -p "$work/core"
           gh release download "experiment-$CORE_RUN-1" --repo "$GITHUB_REPOSITORY" --dir "$work/core" --pattern '*.rpm' --pattern SHA256SUMS --pattern status.txt
           curl -q -fsSL --max-time 60 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/ci/public-pecl-sources.json" -o "$work/public-pecl-sources.json"
+          curl -q -fsSL --max-time 60 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/ci/synthetic-apache-smoke.sh" -o "$work/synthetic-apache-smoke.sh"
           python3 - "$work/keys" <<'PY'
           import pathlib,subprocess,sys
           expected={"2021":"B1ABF71E14C9D74897E198A8B19527F1478F8947","2022":"845160D23149DAD504F0A32D83C0639E1FEF0014","2023":"50A5E157DFE548EC7C05E9D8D5933DAB6DEFD35E"}
