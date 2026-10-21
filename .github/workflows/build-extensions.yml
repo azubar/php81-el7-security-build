@@ -19,6 +19,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
+      - name: Reserve an output metadata tag before the experiment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/extensions-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" -f "sha=$GITHUB_SHA"
       - name: Fetch public inputs only
         shell: bash
         run: |
