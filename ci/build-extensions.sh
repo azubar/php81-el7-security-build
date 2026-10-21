@@ -62,11 +62,16 @@ for src in /work/pecl/*.src.rpm; do
   (cd "$top/SOURCES" && rpm2cpio "$src" | cpio -id --no-absolute-filenames --quiet)
   spec=$(find "$top/SOURCES" -maxdepth 1 -name '*.spec' -print)
   test -f "$spec"
+  if test "$name" = php-pecl-zip; then cp /work/zip-libzip110-test.patch "$top/SOURCES/"; fi
   python - "$spec" "$top/SPECS/candidate.spec" <<'PY'
 import re,sys
 s=open(sys.argv[1]).read()
 s,n=re.subn(r'(?m)^(Release:\s*)([^\n]+)',lambda m:m.group(1)+m.group(2)+'.cve20261022.2',s)
 assert n in (1,2),n
+if '/php-pecl-zip/' in sys.argv[1]:
+    s=s.replace('Release:', 'Source999: zip-libzip110-test.patch\nRelease:',1)
+    assert s.count('%build\n')==1
+    s=s.replace('%build\n', 'patch --fuzz=0 -d NTS -p1 < %{SOURCE999}\n%if %{with_zts}\npatch --fuzz=0 -d ZTS -p1 < %{SOURCE999}\n%endif\n\n%build\n')
 open(sys.argv[2],'w').write(s)
 PY
   spec_paths+=("$top/SPECS/candidate.spec")
