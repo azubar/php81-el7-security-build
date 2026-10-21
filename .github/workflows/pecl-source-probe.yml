@@ -52,11 +52,11 @@ jobs:
           assert manifest["base_url"]=="https://mirror.speedpartner.de/remi-archive/SRPMS/"
           for item in manifest["sources"]:
               name=item["filename"]
-              assert re.fullmatch(r"php-pecl-[A-Za-z0-9_.+-]+\\.src\\.rpm",name),name
+              assert re.fullmatch(r"php-pecl-[A-Za-z0-9_.+-]+\.src\.rpm",name),name
               subprocess.run(["curl","-q","-fsSL","--retry","2","--connect-timeout","10","--max-time","90","--max-filesize","4194304",manifest["base_url"]+name,"-o",name],check=True)
               assert hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()==item["sha256"],name
               text=subprocess.check_output(["rpm","--dbpath",db,"-Kv",name],text=True)
               print(text)
-              assert re.search(r"Signature[^\\n]*: OK",text,re.I),name
+              assert re.search(r"Signature[^\n]*: OK",text,re.I),name
               print("PUBLIC_PECL_SOURCE_SIGNATURE_OK",name,item["sha256"])
           PY
