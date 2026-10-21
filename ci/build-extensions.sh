@@ -30,9 +30,9 @@ for f in core/*.rpm; do
   { echo "PACKAGE $name"; rpm -qpl "$f"; } >> result/core-all-filelists.txt
   { echo "PACKAGE $name"; rpm -qp --scripts "$f"; } >> result/core-all-scriptlets.txt
   case "$release" in *cve20261022.2) ;; *) echo 'Unexpected core release'; exit 1;; esac
-  case "$name" in php|php-soap|php-sodium|php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
+  case "$name" in php-dbg|php-embedded|php-fpm|php-litespeed) ;; *) selected+=("$f");; esac
 done
-test "${#selected[@]}" -ge 6
+test "${#selected[@]}" -ge 26
 yum -y --disablerepo='*' --enablerepo='build-*' localinstall "${selected[@]}"
 yum -y --disablerepo='*' --enablerepo='build-*' install php-pear curl
 php -n -v | tee result/patched-cli-version.txt
@@ -53,7 +53,8 @@ for x in m['sources']:
     print(v)
     assert re.search(r'Signature[^\n]*: OK',v,re.I)
 PY
-overall=0
+spec_paths=()
+: > /work/extension-build-manifest.txt
 for src in /work/pecl/*.src.rpm; do
   name=$(rpm -qp --qf '%{NAME}' "$src")
   top="/work/pecl/$name"
@@ -68,11 +69,19 @@ s,n=re.subn(r'(?m)^(Release:\s*)([^\n]+)',lambda m:m.group(1)+m.group(2)+'.cve20
 assert n in (1,2),n
 open(sys.argv[2],'w').write(s)
 PY
-  if ! yum-builddep -y --disablerepo='*' --enablerepo='build-*' --define 'rhel 7' --define 'dist .el7.remi' --define '_with_tests 1' "$top/SPECS/candidate.spec"; then
-    echo "$name|DEPENDENCY_FAILURE" | tee -a result/extension-status.txt
-    overall=1
-    continue
-  fi
+  spec_paths+=("$top/SPECS/candidate.spec")
+  printf '%s|%s|%s\n' "$name" "$top" "$top/SPECS/candidate.spec" >> /work/extension-build-manifest.txt
+done
+test "${#spec_paths[@]}" = 7
+# Resolve the entire declared dependency graph before compiling any extension.
+yum-builddep -y --disablerepo='*' --enablerepo='build-*' \
+  --define 'rhel 7' --define 'dist .el7.remi' \
+  --define '_with_tests 1' --define 'with_tests 1' "${spec_paths[@]}"
+rpm -qa --qf '%{NAME}|%{EPOCH}|%{VERSION}|%{RELEASE}|%{ARCH}\n' \
+  | sort > result/complete-external-build-environment.txt
+echo 'ALL_SEVEN_EXTENSION_DEPENDENCIES_RESOLVED_BEFORE_COMPILATION'
+overall=0
+while IFS='|' read -r name top spec; do
   # Package build and local synthetic test daemons run without root privileges.
   chown -R builder:builder "$top"
   extra_test_flags=(--define 'with_tests 1')
@@ -87,7 +96,7 @@ PY
   else
     overall=1
   fi
-done
+done < /work/extension-build-manifest.txt
 rpm -q php-common php-cli php-devel > result/core-sdk-installed.txt
 if test -x /usr/bin/zts-php; then /usr/bin/zts-php -n -v >> result/core-sdk-installed.txt; else echo 'No ZTS CLI in selected package set' >> result/core-sdk-installed.txt; fi
 echo 'EXPERIMENTAL ONLY. No production approval. See per-extension strict test results.' > result/ACCEPTANCE.txt
