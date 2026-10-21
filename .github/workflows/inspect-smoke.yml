@@ -1,0 +1,21 @@
+name: Inspect synthetic SAPI diagnostics
+on:
+  push:
+    paths: ['.github/workflows/inspect-smoke.yml']
+permissions:
+  contents: write
+jobs:
+  inspect:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read only isolated synthetic Apache diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir diagnostics
+          gh release download extensions-39684871780-1 --dir diagnostics --pattern 'apache-*'
+          for f in diagnostics/*; do echo "$f"; cat "$f"; echo; done
