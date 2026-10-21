@@ -15,6 +15,7 @@ session.save_handler=files
 session.save_path=/work/smoke-sessions
 zend_extension=$opcache
 opcache.enable=1
+opcache.enable_cli=1
 display_errors=0
 log_errors=1
 INI
@@ -29,6 +30,8 @@ echo json_encode([
  'zts'=>PHP_ZTS,
  'session_count'=>$_SESSION['n'],
  'opcache'=>extension_loaded('Zend OPcache'),
+ 'opcache_enabled'=>(opcache_get_status(false)['opcache_enabled'] ?? false),
+ 'modules'=>array_map('extension_loaded', ['apcu','geoip','mcrypt','memcache','rrd','zip']),
  'upload_ok'=>isset($_FILES['sample']) && $_FILES['sample']['error']===0 &&
               file_get_contents($_FILES['sample']['tmp_name'])==="synthetic-only\n"
 ]);
@@ -56,7 +59,7 @@ PHPINIDir /work/smoke-ini
   SetHandler application/x-httpd-php
 </FilesMatch>
 CONF
-export PHP_INI_SCAN_DIR=/work/smoke-empty
+export PHP_INI_SCAN_DIR="${EXTERNAL_SMOKE_SCAN_DIR:-/work/smoke-empty}"
 httpd -t -f /work/smoke-httpd.conf
 httpd -t -D DUMP_MODULES -f /work/smoke-httpd.conf > /work/result/apache-smoke-modules.txt 2>&1
 test "$(grep -c 'php_module' /work/result/apache-smoke-modules.txt)" = 1
@@ -70,7 +73,7 @@ done
 printf 'synthetic-only\n' > /work/smoke-upload.txt
 curl -q -fsS --max-time 10 --cookie /work/smoke-cookies -F sample=@/work/smoke-upload.txt   http://127.0.0.1:18080/check.php > /work/result/apache-response-2.json
 python - <<'PY'
-import json
+import json,os
 a=json.load(open('/work/result/apache-response-1.json'))
 b=json.load(open('/work/result/apache-response-2.json'))
 print(a)
@@ -78,6 +81,9 @@ print(b)
 assert a['sapi']=='apache2handler' and a['zts']==0 and a['opcache'] is True
 assert a['version']=='8.1.18' and a['session_count']==1
 assert b['session_count']==2 and b['upload_ok'] is True
+assert a['opcache_enabled'] is True
+if os.environ.get('EXTERNAL_SMOKE_REQUIRE_EXTENSIONS')=='1':
+    assert all(a['modules']) and all(b['modules']), (a,b)
 print('ISOLATED_APACHE_PREFORK_PHP_OPCACHE_SESSION_UPLOAD_SMOKE_OK')
 print(a)
 print(b)
