@@ -1,0 +1,40 @@
+name: Inspect compiled package metadata
+on:
+  push:
+    paths: ['.github/workflows/inspect-package-metadata.yml']
+permissions:
+  contents: write
+jobs:
+  inspect:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Inspect retained dependency and scriptlet metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir metadata
+          gh release download extensions-39684495789-1 --dir metadata --pattern 'core-all-*.txt' --pattern SHA256SUMS
+          (cd metadata && sha256sum --ignore-missing -c SHA256SUMS)
+          python3 - <<'PY'
+          import re
+          for line in open('metadata/core-all-requires.txt'):
+              if line.startswith('PACKAGE ') or re.match(r'^(lib(c\.so|ssl|crypto|icu|zip|gd|onig)|php\(|php-common|php-sodium)',line):
+                  print(line.rstrip())
+          print('COMPILED PACKAGE SCRIPTLETS')
+          print(open('metadata/core-all-scriptlets.txt').read())
+          print('APACHE MODULE AND CONFIG PATHS')
+          for line in open('metadata/core-all-filelists.txt'):
+              if line.startswith('PACKAGE ') or re.search(r'httpd|libphp|php\.ini',line):
+                  print(line.rstrip())
+          PY
+      - name: Inspect only public upstream test certificate validity dates
+        run: |
+          set -euo pipefail
+          for name in sni_server_ca.pem sni_server_cs_cert.pem sni_server_uk_cert.pem sni_server_us_cert.pem; do
+            echo "PUBLIC UPSTREAM FIXTURE $name"
+            curl -q -fsSL --connect-timeout 10 --max-time 30 "https://raw.githubusercontent.com/php/php-src/php-8.1.18/ext/openssl/tests/$name" | openssl x509 -noout -dates
+          done
