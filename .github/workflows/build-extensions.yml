@@ -51,6 +51,7 @@ jobs:
           curl -q -fsSL --connect-timeout 10 --max-time 60 \
             "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/ci/build-extensions.sh" \
             -o "$work/build-extensions.sh"
+          curl -q -fsSL --connect-timeout 10 --max-time 60 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/patches/zip-libzip110-test.patch" -o "$work/zip-libzip110-test.patch"
           sha256sum "$work/preflight.sh" "$work/security-backport.patch" "$work/build-extensions.sh"
 
       - name: Obtain only the successful experimental core and public source manifest
