@@ -3,7 +3,7 @@
 set -euo pipefail
 test "$EXTERNAL_CI" = 1
 test -f /work/EXTERNAL_CI_ONLY
-mkdir -p /work/smoke-site /work/smoke-ini /work/smoke-sessions /work/httpd-run /work/result
+mkdir -p /work/smoke-site /work/smoke-ini /work/smoke-empty /work/smoke-sessions /work/httpd-run /work/result
 chown builder:builder /work/smoke-sessions /work/httpd-run
 module=$(rpm -ql php | awk '/\/libphp.so$/ {print; exit}')
 test -f "$module"
@@ -56,6 +56,7 @@ PHPINIDir /work/smoke-ini
   SetHandler application/x-httpd-php
 </FilesMatch>
 CONF
+export PHP_INI_SCAN_DIR=/work/smoke-empty
 httpd -t -f /work/smoke-httpd.conf
 httpd -t -D DUMP_MODULES -f /work/smoke-httpd.conf > /work/result/apache-smoke-modules.txt 2>&1
 test "$(grep -c 'php_module' /work/result/apache-smoke-modules.txt)" = 1
