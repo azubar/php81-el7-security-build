@@ -59,4 +59,25 @@ for target in targets:
 print(json.dumps(out,indent=2))
 print('EXACT_CRITICAL_FILES_MATCHED='+str(sum(x['any_exact_match'] for x in out))+'/'+str(len(out)))
 print('This establishes only the compared source bytes, not complete original SRPM identity or application compatibility.')
+
+# Broaden the comparison to authenticated source files present in the baseline.
+matched=[];different=[];not_in_baseline=[]
+for original in files:
+    marker='/php-8.1.18/'
+    if marker not in original:
+        continue
+    relative=original.split(marker,1)[1]
+    candidate=os.path.join(baseline,relative)
+    if not os.path.isfile(candidate):
+        not_in_baseline.append(relative)
+        continue
+    oldhash=hashlib.sha256(open(original,'rb').read()).hexdigest()
+    newhash=hashlib.sha256(open(candidate,'rb').read()).hexdigest()
+    if oldhash==newhash:
+        matched.append(relative)
+    else:
+        different.append({'path':relative,'authenticated_sha256':oldhash,'candidate_sha256':newhash})
+print('FULL_AUTHENTICATED_SOURCE_COMPARISON')
+print(json.dumps({'exact_match_count':len(matched),'different_files':different,'not_in_prepared_baseline':not_in_baseline},indent=2))
+
 PY
