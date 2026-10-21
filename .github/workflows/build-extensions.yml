@@ -122,6 +122,12 @@ jobs:
         run: |
           set -euo pipefail
           result="$RUNNER_TEMP/public-el7-preflight/result"
+          if test -d "$result"; then
+            test -f "$result/ACCEPTANCE.txt" || echo 'INCOMPLETE EXPERIMENT; NOT APPROVED FOR PRODUCTION.' > "$result/ACCEPTANCE.txt"
+            test -f "$result/status.txt" || echo 'See extension-status.txt and job logs; incomplete results are not approval.' > "$result/status.txt"
+            find "$result" -maxdepth 1 -type f -empty -exec sh -c 'printf "No diagnostic output was generated.\\n" > "$1"' sh '{}' \\;
+            (cd "$result" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          fi
           if test ! -f "$result/ACCEPTANCE.txt"; then
             echo 'No completed build report; no candidate is retained.'
             exit 0
