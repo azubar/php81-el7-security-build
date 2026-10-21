@@ -1,6 +1,8 @@
 name: Rebuild extensions against patched EL7 SDK
 
 on:
+  push:
+    paths: ['.github/workflows/build-extensions.yml']
   workflow_run:
     workflows: ['Build experimental PHP 8.1 EL7 candidate']
     types: [completed]
@@ -15,7 +17,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.event.repository.private == false && github.event.workflow_run.conclusion == 'success'
+    if: github.event.repository.private == false && (github.event_name == 'push' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -54,7 +56,7 @@ jobs:
       - name: Obtain only the successful experimental core and public source manifest
         env:
           GH_TOKEN: ${{ github.token }}
-          CORE_RUN: ${{ github.event.workflow_run.id }}
+          CORE_RUN: ${{ github.event.workflow_run.id || '39682743946' }}
         run: |
           set -euo pipefail
           work="$RUNNER_TEMP/public-el7-preflight"
@@ -123,6 +125,7 @@ jobs:
           set -euo pipefail
           result="$RUNNER_TEMP/public-el7-preflight/result"
           if test -d "$result"; then
+            sudo chown -R "$(id -u):$(id -g)" "$result"
             test -f "$result/ACCEPTANCE.txt" || echo 'INCOMPLETE EXPERIMENT; NOT APPROVED FOR PRODUCTION.' > "$result/ACCEPTANCE.txt"
             test -f "$result/status.txt" || echo 'See extension-status.txt and job logs; incomplete results are not approval.' > "$result/status.txt"
             find "$result" -maxdepth 1 -type f -empty -exec sh -c 'printf "No diagnostic output was generated.\\n" > "$1"' sh '{}' \;
