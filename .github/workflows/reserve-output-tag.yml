@@ -1,0 +1,19 @@
+name: Reserve experiment output tag
+on:
+  push:
+    paths: ['.github/workflows/reserve-output-tag.yml']
+permissions:
+  contents: write
+jobs:
+  reserve:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Reserve metadata tag for the already running experiment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/experiment-39680988739-1 -f sha="$GITHUB_SHA"
+          echo 'Tag is output metadata only. Actual build source commit remains 153fa3122e4d2c27c71b8df20de3ba34fa8cda80 and is recorded in release notes.'
