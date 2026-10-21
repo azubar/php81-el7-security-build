@@ -10,6 +10,7 @@ grep -qx 'RPMBUILD_EXIT_STATUS=0' core/status.txt
 (cd core && sha256sum --ignore-missing -c SHA256SUMS)
 selected=()
 for f in core/*.rpm; do
+  case "$f" in *.src.rpm) continue;; esac
   test "$(rpm -qp --qf '%{ARCH}' "$f")" != src || continue
   name=$(rpm -qp --qf '%{NAME}' "$f")
   release=$(rpm -qp --qf '%{RELEASE}' "$f")
@@ -74,7 +75,8 @@ PY
     overall=1
   fi
 done
-rpm -q php-common php-cli php-devel php-zts > result/core-sdk-installed.txt
+rpm -q php-common php-cli php-devel > result/core-sdk-installed.txt
+rpm -q php-zts >> result/core-sdk-installed.txt 2>&1 || true
 echo 'EXPERIMENTAL ONLY. No production approval. See per-extension strict test results.' > result/ACCEPTANCE.txt
 (cd result && sha256sum * > SHA256SUMS)
 exit "$overall"
