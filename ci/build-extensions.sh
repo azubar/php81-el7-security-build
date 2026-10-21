@@ -30,7 +30,7 @@ for f in core/*.rpm; do
   { echo "PACKAGE $name"; rpm -qpl "$f"; } >> result/core-all-filelists.txt
   { echo "PACKAGE $name"; rpm -qp --scripts "$f"; } >> result/core-all-scriptlets.txt
   case "$release" in *cve20261022.2) ;; *) echo 'Unexpected core release'; exit 1;; esac
-  case "$name" in php|php-sodium|php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
+  case "$name" in php|php-soap|php-sodium|php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
 done
 test "${#selected[@]}" -ge 6
 yum -y --disablerepo='*' --enablerepo='build-*' localinstall "${selected[@]}"
@@ -75,8 +75,10 @@ PY
   fi
   # Package build and local synthetic test daemons run without root privileges.
   chown -R builder:builder "$top"
+  extra_test_flags=()
+  if test "$name" = php-pecl-zip; then extra_test_flags=(--define 'with_tests 1'); fi
   set +e
-  runuser -u builder -- env NO_INTERACTION=1 REPORT_EXIT_STATUS=1 SKIP_ONLINE_TESTS=1     rpmbuild -ba --with tests --define "_topdir $top" --define 'rhel 7'     --define 'dist .el7.remi' --define '_smp_mflags -j4'     --define 'vendor Local experimental security rebuild' "$top/SPECS/candidate.spec"     > "result/$name-build.log" 2>&1
+  runuser -u builder -- env NO_INTERACTION=1 REPORT_EXIT_STATUS=1 SKIP_ONLINE_TESTS=1     rpmbuild -ba --with tests "${extra_test_flags[@]}" --define "_topdir $top" --define 'rhel 7'     --define 'dist .el7.remi' --define '_smp_mflags -j4'     --define 'vendor Local experimental security rebuild' "$top/SPECS/candidate.spec"     > "result/$name-build.log" 2>&1
   rc=$?
   set -e
   echo "$name|$rc" | tee -a result/extension-status.txt
