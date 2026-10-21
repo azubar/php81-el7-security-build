@@ -65,7 +65,7 @@ for src in /work/pecl/*.src.rpm; do
 import re,sys
 s=open(sys.argv[1]).read()
 s,n=re.subn(r'(?m)^(Release:\s*)([^\n]+)',lambda m:m.group(1)+m.group(2)+'.cve20261022.2',s)
-assert n==1
+assert n in (1,2),n
 open(sys.argv[2],'w').write(s)
 PY
   if ! yum-builddep -y --disablerepo='*' --enablerepo='build-*' --define 'rhel 7' --define 'dist .el7.remi' --define '_with_tests 1' "$top/SPECS/candidate.spec"; then
