@@ -17,9 +17,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir reports
-          gh release download extensions-39686335205-1 --dir reports --pattern '*build.log' --pattern extension-status.txt --pattern SHA256SUMS
+          gh release download extensions-39687321079-1 --dir reports --pattern '*build.log' --pattern extension-status.txt --pattern SHA256SUMS --pattern 'combined-*.json' --pattern 'combined-runtime-status.txt' --pattern 'apache-response-*.json' --pattern 'core-sdk-installed.txt'
           (cd reports && sha256sum --ignore-missing -c SHA256SUMS)
-          cat reports/extension-status.txt
+          cat reports/extension-status.txt reports/combined-runtime-status.txt reports/combined-cli.json reports/apache-response-1.json reports/apache-response-2.json reports/core-sdk-installed.txt
           python3 - <<'PY'
           import pathlib,re
           for p in sorted(pathlib.Path('reports').glob('*build.log')):
