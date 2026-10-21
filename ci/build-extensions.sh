@@ -7,7 +7,19 @@ cd /work
 mkdir -p result pecl
 test -f core/status.txt
 grep -qx 'RPMBUILD_EXIT_STATUS=0' core/status.txt
-(cd core && sha256sum --ignore-missing -c SHA256SUMS)
+python - <<'PY'
+import hashlib,os
+base='/work/core'
+checks={}
+for line in open(base+'/SHA256SUMS'):
+    digest,name=line.rstrip().split(None,1)
+    checks[name.lstrip('*')]=digest
+for name in os.listdir(base):
+    if name=='SHA256SUMS':continue
+    assert name in checks,name
+    assert hashlib.sha256(open(base+'/'+name,'rb').read()).hexdigest()==checks[name],name
+    print('RETAINED_CORE_SHA256_OK '+name)
+PY
 selected=()
 for f in core/*.rpm; do
   case "$f" in *.src.rpm) continue;; esac
