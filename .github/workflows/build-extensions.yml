@@ -165,3 +165,4 @@ jobs:
             echo 'A passing candidate build is not application compatibility, full security acceptance, or deployment approval.'
             echo 'The generic unsigned SRPM is still not proven to be the exact original EL7 source.'
           } >> "$GITHUB_STEP_SUMMARY"
+# Retry with the complete required core SDK companion set.
