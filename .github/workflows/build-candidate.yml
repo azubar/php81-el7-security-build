@@ -113,7 +113,7 @@ jobs:
             echo 'Draft only; no release publication, production deployment, paid runner, or Actions artifact storage.'
           } > "$notes"
           gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" --draft --prerelease \
+            --target main --draft --prerelease \
             --title "Experimental PHP 8.1 EL7 result $GITHUB_RUN_ID" \
             --notes-file "$notes" "$result"/*
           echo "Draft experiment tag: $tag"
