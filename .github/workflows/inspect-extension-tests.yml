@@ -1,0 +1,32 @@
+name: Inspect complete extension regression reports
+on:
+  push:
+    paths: ['.github/workflows/inspect-extension-tests.yml']
+permissions:
+  contents: write
+jobs:
+  inspect:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Read retained synthetic regression summaries and failure context
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir reports
+          gh release download extensions-39686335205-1 --dir reports --pattern '*build.log' --pattern extension-status.txt --pattern SHA256SUMS
+          (cd reports && sha256sum --ignore-missing -c SHA256SUMS)
+          cat reports/extension-status.txt
+          python3 - <<'PY'
+          import pathlib,re
+          for p in sorted(pathlib.Path('reports').glob('*build.log')):
+              s=re.sub(r'\x1b\[[0-9;]*[A-Za-z]','',p.read_text())
+              print('REPORT',p.name)
+              for line in s.splitlines():
+                  if re.match(r'^(Number of tests|Tests (passed|failed|skipped|warned)|Expected fail|FAILED TEST SUMMARY)',line): print(line)
+              for m in re.finditer(r'FAIL [^\n]*oo_getstreamindex',s):
+                  print(s[max(0,m.start()-3500):m.end()+3500])
+          PY
