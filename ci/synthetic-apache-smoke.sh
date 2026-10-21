@@ -7,7 +7,7 @@ mkdir -p /work/smoke-site /work/smoke-ini /work/smoke-empty /work/smoke-sessions
 chown builder:builder /work/smoke-sessions /work/httpd-run
 module=$(rpm -ql php | awk '/\/libphp.so$/ {print; exit}')
 test -f "$module"
-opcache=$(rpm -ql php-opcache | awk '/\/opcache.so$/ {print; exit}')
+opcache="$(php-config --extension-dir)/opcache.so"
 test -f "$opcache"
 cat > /work/smoke-ini/php.ini <<INI
 date.timezone=UTC
@@ -60,7 +60,7 @@ export PHP_INI_SCAN_DIR=/work/smoke-empty
 httpd -t -f /work/smoke-httpd.conf
 httpd -t -D DUMP_MODULES -f /work/smoke-httpd.conf > /work/result/apache-smoke-modules.txt 2>&1
 test "$(grep -c 'php_module' /work/result/apache-smoke-modules.txt)" = 1
-httpd -DFOREGROUND -f /work/smoke-httpd.conf &
+setsid httpd -DFOREGROUND -f /work/smoke-httpd.conf &
 smoke_pid=$!
 trap 'kill "$smoke_pid" 2>/dev/null || true; wait "$smoke_pid" 2>/dev/null || true' EXIT
 for n in 1 2 3 4 5; do
@@ -73,6 +73,8 @@ python - <<'PY'
 import json
 a=json.load(open('/work/result/apache-response-1.json'))
 b=json.load(open('/work/result/apache-response-2.json'))
+print(a)
+print(b)
 assert a['sapi']=='apache2handler' and a['zts']==0 and a['opcache'] is True
 assert a['version']=='8.1.18' and a['session_count']==1
 assert b['session_count']==2 and b['upload_ok'] is True
@@ -80,4 +82,4 @@ print('ISOLATED_APACHE_PREFORK_PHP_OPCACHE_SESSION_UPLOAD_SMOKE_OK')
 print(a)
 print(b)
 PY
-if grep -Ei 'already loaded|Cannot load|PHP (Warning|Fatal)' /work/result/apache-smoke-error.log; then exit 1; fi
+if grep -Ei 'already loaded|Cannot load|Failed loading|undefined symbol|PHP (Warning|Fatal)' /work/result/apache-smoke-error.log; then exit 1; fi
