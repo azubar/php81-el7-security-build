@@ -22,7 +22,7 @@ for f in core/*.rpm; do
 done
 test "${#selected[@]}" -ge 6
 yum -y --disablerepo='*' --enablerepo='build-*' localinstall "${selected[@]}"
-yum -y --disablerepo='*' --enablerepo='build-*' install php-pear
+yum -y --disablerepo='*' --enablerepo='build-*' install php-pear curl
 php -n -v | tee result/patched-cli-version.txt
 php-config --vernum | tee result/patched-sdk-version.txt
 rpm --import /work/keys/remi2021.asc /work/keys/remi2022.asc /work/keys/remi2023.asc
