@@ -1,0 +1,20 @@
+name: Publish reviewed experimental candidates
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-reviewed-candidates.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Publish existing candidate assets as experimental prereleases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release edit experiment-39682743946-1 --draft=false --prerelease --latest=false
+          gh release edit extensions-39687321079-1 --draft=false --prerelease --latest=false
