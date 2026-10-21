@@ -27,3 +27,31 @@ build dependencies, patch adaptation, and regression results are separate gates.
 The source-probe workflow uses only a standard Ubuntu public GitHub-hosted runner.
 It inspects public files and logs metadata. It does not compile PHP, execute an
 SRPM recipe, deploy anything, or upload billed build artifacts.
+
+## External build and corroboration status
+
+The EL7 preparation succeeds with all backport hunks applied at fuzz zero.
+An original signed EL7 debuginfo RPM corroborates 1371 available baseline C/H files,
+with no differences among comparable files; generated build-directory files and
+complete original SRPM identity remain outside that comparison.
+[Comparison run](https://github.com/azubar/php81-el7-security-build/actions/runs/39679791093).
+
+The first candidate compiled to the strict regression gate and stopped on eleven
+unexpected failures. It produced no accepted RPM set. Nine failures relate to
+intentional upstream EOL mitigation behavior, and two involve old TLS fixtures.
+See [the test policy](ci/TEST-POLICY.md) for explicit replacement assertions.
+A separate unpatched control build uses the same environment.
+
+The upstream minimal mitigation disables PHP session upload progress and exits
+the process immediately on allocation failure. These are observable behavior changes.
+No application compatibility is claimed.
+
+Build outputs and diagnostics, when available, are retained only as draft release
+assets; no release is published, no Actions artifact storage is used, and no
+production deployment is configured. Standard runners for this public repository
+are used. Extension builds require a successful strict core build, use its SDK,
+and run non-root synthetic tests in disposable EL7 containers.
+
+This experiment targets the two stated CVEs. It does not claim to fix all other
+vulnerabilities accumulated since PHP 8.1.18, maintain EL7, or provide ongoing
+vendor security support. A successful build is not production acceptance.
