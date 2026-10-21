@@ -55,7 +55,7 @@ jobs:
           docker run --rm --platform linux/amd64 "$image" \
             cat /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7 > "$work/keys/centos.asc"
           curl -q -fsSL --connect-timeout 10 --max-time 60 \
-            https://archives.fedoraproject.org/pub/archive/epel/RPM-GPG-KEY-EPEL-7 \
+            https://raw.githubusercontent.com/rpm-software-management/distribution-gpg-keys/main/keys/epel/RPM-GPG-KEY-EPEL-7 \
             -o "$work/keys/epel.asc"
           curl -q -fsSL --connect-timeout 10 --max-time 60 \
             https://mirror.speedpartner.de/remi/enterprise/7/RPM-GPG-KEY-remi \
