@@ -76,7 +76,7 @@ PY
   fi
 done
 rpm -q php-common php-cli php-devel > result/core-sdk-installed.txt
-rpm -q php-zts >> result/core-sdk-installed.txt 2>&1 || true
+if test -x /usr/bin/zts-php; then /usr/bin/zts-php -n -v >> result/core-sdk-installed.txt; else echo 'No ZTS CLI in selected package set' >> result/core-sdk-installed.txt; fi
 echo 'EXPERIMENTAL ONLY. No production approval. See per-extension strict test results.' > result/ACCEPTANCE.txt
 (cd result && sha256sum * > SHA256SUMS)
 exit "$overall"
