@@ -97,6 +97,39 @@ while IFS='|' read -r name top spec; do
     overall=1
   fi
 done < /work/extension-build-manifest.txt
+
+if test "$overall" -eq 0; then
+  extension_rpms=()
+  for pkg in /work/result/*.x86_64.rpm; do
+    case "$(rpm -qp --qf '%{NAME}' "$pkg")" in
+      php-pecl-apcu|php-pecl-geoip|php-pecl-mcrypt|php-pecl-memcache|php-pecl-rrd|php-pecl-zip|php-pecl-xdebug3) extension_rpms+=("$pkg");;
+    esac
+  done
+  test "${#extension_rpms[@]}" = 7
+  yum -y --disablerepo='*' --enablerepo='build-*' localinstall "${extension_rpms[@]}"
+  mkdir -p /work/combined-scan
+  for ini in /etc/php.d/*.ini; do
+    case "$ini" in *xdebug*|*opcache*) continue;; esac
+    cp "$ini" /work/combined-scan/
+  done
+  # No production settings are used. Xdebug stays out of the combined application configuration.
+  EXTERNAL_SMOKE_SCAN_DIR=/work/combined-scan EXTERNAL_SMOKE_REQUIRE_EXTENSIONS=1 \
+    bash /work/synthetic-apache-smoke.sh
+  PHP_INI_SCAN_DIR=/work/combined-scan php -c /work/smoke-ini/php.ini -d apc.enable_cli=1 -r '
+    $required=["Zend OPcache","apcu","geoip","mcrypt","memcache","rrd","zip","mysqli","gd","bcmath","mbstring","soap","PDO","dom","SimpleXML","sodium"];
+    $versions=[];
+    foreach ($required as $name) {
+      if (!extension_loaded($name)) { fwrite(STDERR,"Missing module: ".$name."\\n"); exit(1); }
+      $versions[$name]=phpversion($name);
+    }
+    if (!apcu_store("isolated_ci_probe","ok") || apcu_fetch("isolated_ci_probe")!=="ok") exit(2);
+    if (!(opcache_get_status(false)["opcache_enabled"] ?? false)) exit(3);
+    echo json_encode(["sapi"=>PHP_SAPI,"zts"=>PHP_ZTS,"modules"=>$versions]),"\\n";
+  ' > /work/result/combined-cli.json 2> /work/result/combined-cli-stderr.txt
+  test ! -s /work/result/combined-cli-stderr.txt
+  echo 'ALL_REQUIRED_MODULES_COMBINED_CLI_AND_APACHE_OK' | tee /work/result/combined-runtime-status.txt
+fi
+
 rpm -q php-common php-cli php-devel > result/core-sdk-installed.txt
 if test -x /usr/bin/zts-php; then /usr/bin/zts-php -n -v >> result/core-sdk-installed.txt; else echo 'No ZTS CLI in selected package set' >> result/core-sdk-installed.txt; fi
 echo 'EXPERIMENTAL ONLY. No production approval. See per-extension strict test results.' > result/ACCEPTANCE.txt
