@@ -1,0 +1,19 @@
+name: Check draft output storage
+on:
+  push:
+    paths: ['.github/workflows/draft-storage-check.yml']
+permissions:
+  contents: write
+jobs:
+  check:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify draft-only output storage using current branch metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf 'Synthetic storage check only. No production data or binaries.\n' > storage-check.txt
+          gh release create "storage-check-$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --target main --draft --prerelease --title 'Draft storage verification' --notes 'Public synthetic diagnostic only. Not a build or production release.' storage-check.txt
