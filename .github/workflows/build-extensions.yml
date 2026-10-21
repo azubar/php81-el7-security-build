@@ -168,3 +168,4 @@ jobs:
 # Retry with the complete required core SDK companion set.
 # Retry with explicit NTS OPcache selection in the synthetic Apache test.
 # Preserve conditional Release definitions in public PECL specs.
+# Include matching SOAP and explicitly run the ZIP suite.
