@@ -3,7 +3,7 @@ on:
   push:
     paths: ['.github/workflows/inspect-failure.yml']
 permissions:
-  contents: read
+  contents: write
 jobs:
   inspect:
     if: github.event.repository.private == false
