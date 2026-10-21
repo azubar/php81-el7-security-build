@@ -75,8 +75,7 @@ PY
   fi
   # Package build and local synthetic test daemons run without root privileges.
   chown -R builder:builder "$top"
-  extra_test_flags=()
-  if test "$name" = php-pecl-zip; then extra_test_flags=(--define 'with_tests 1'); fi
+  extra_test_flags=(--define 'with_tests 1')
   set +e
   runuser -u builder -- env NO_INTERACTION=1 REPORT_EXIT_STATUS=1 SKIP_ONLINE_TESTS=1     rpmbuild -ba --with tests "${extra_test_flags[@]}" --define "_topdir $top" --define 'rhel 7'     --define 'dist .el7.remi' --define '_smp_mflags -j4'     --define 'vendor Local experimental security rebuild' "$top/SPECS/candidate.spec"     > "result/$name-build.log" 2>&1
   rc=$?
