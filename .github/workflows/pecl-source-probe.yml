@@ -1,0 +1,62 @@
+name: Verify public PECL source signatures
+on:
+  push:
+    paths:
+      - .github/workflows/pecl-source-probe.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Install source inspection tools on the external runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -q -fsSL --connect-timeout 10 --max-time 30 "https://api.github.com/repos/$GITHUB_REPOSITORY" \
+            | python3 -c 'import json,sys; assert json.load(sys.stdin)["private"] is False'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends rpm curl gnupg
+      - name: Verify full Remi fingerprints and each pinned SRPM signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          mkdir pecl-source-probe
+          cd pecl-source-probe
+          curl -q -fsSL --connect-timeout 10 --max-time 60 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/ci/public-pecl-sources.json" \
+            -o manifest.json
+          python3 - <<'PY'
+          import hashlib,json,pathlib,re,subprocess
+          expected={
+              "2021":"B1ABF71E14C9D74897E198A8B19527F1478F8947",
+              "2022":"845160D23149DAD504F0A32D83C0639E1FEF0014",
+              "2023":"50A5E157DFE548EC7C05E9D8D5933DAB6DEFD35E",
+          }
+          db=str(pathlib.Path("rpmdb").absolute())
+          subprocess.run(["rpm","--dbpath",db,"--initdb"],check=True)
+          for year,want in expected.items():
+              key="remi"+year+".asc"
+              url="https://raw.githubusercontent.com/rpm-software-management/distribution-gpg-keys/main/keys/remi/RPM-GPG-KEY-remi"+year
+              subprocess.run(["curl","-q","-fsSL","--connect-timeout","10","--max-time","60",url,"-o",key],check=True)
+              text=subprocess.check_output(["gpg","--batch","--show-keys","--with-colons",key],text=True)
+              got=next(l.split(":")[9] for l in text.splitlines() if l.startswith("fpr:"))
+              assert got==want,(year,got)
+              subprocess.run(["rpm","--dbpath",db,"--import",key],check=True)
+              print("VERIFIED KEY FINGERPRINT",year,got)
+          manifest=json.loads(pathlib.Path("manifest.json").read_text())
+          assert manifest["base_url"]=="https://mirror.speedpartner.de/remi-archive/SRPMS/"
+          for item in manifest["sources"]:
+              name=item["filename"]
+              assert re.fullmatch(r"php-pecl-[A-Za-z0-9_.+-]+\\.src\\.rpm",name),name
+              subprocess.run(["curl","-q","-fsSL","--retry","2","--connect-timeout","10","--max-time","90","--max-filesize","4194304",manifest["base_url"]+name,"-o",name],check=True)
+              assert hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()==item["sha256"],name
+              text=subprocess.check_output(["rpm","--dbpath",db,"-Kv",name],text=True)
+              print(text)
+              assert re.search(r"Signature[^\\n]*: OK",text,re.I),name
+              print("PUBLIC_PECL_SOURCE_SIGNATURE_OK",name,item["sha256"])
+          PY
