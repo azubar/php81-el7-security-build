@@ -1,0 +1,34 @@
+{
+  "base_url": "https://mirror.speedpartner.de/remi-archive/SRPMS/",
+  "sources": [
+    {
+      "filename": "php-pecl-apcu-5.1.22-1.remi.src.rpm",
+      "sha256": "b2829aa1143bdce7d95b6ef40a3b7316ed906e31e6f112e0b92bdfbc83231fff"
+    },
+    {
+      "filename": "php-pecl-geoip-1.1.1-16.remi.src.rpm",
+      "sha256": "1d1a268d74fc705bc7d4bd4288806d835ab943a901b963d6b1566733aad76da2"
+    },
+    {
+      "filename": "php-pecl-mcrypt-1.0.6-1.remi.src.rpm",
+      "sha256": "8f11ba195532212254109880752716ea5655526177e58b69475784c91f48f8d1"
+    },
+    {
+      "filename": "php-pecl-memcache-8.0-3.remi.src.rpm",
+      "sha256": "f4d39abae88c2cbe64ee0033f7bae39e143e1fb02dbc5851f24618ca46ce2a1b"
+    },
+    {
+      "filename": "php-pecl-rrd-2.0.3-2.remi.src.rpm",
+      "sha256": "6e26400dc9e84df0470df83d3cdd143c9b380aea327e69e3015fc5967b9bf169"
+    },
+    {
+      "filename": "php-pecl-zip-1.21.1-1.remi.src.rpm",
+      "sha256": "1332600ce56a66eecec60be853d31ea48b5d21c87dc02e66bc98105fa20586a7"
+    },
+    {
+      "filename": "php-pecl-xdebug3-3.2.1-1.remi.src.rpm",
+      "sha256": "a229124685bf0e1e9143d53a3ef1efd1e4a33268fde02d85795b19a4a05f77f4"
+    }
+  ],
+  "notice": "Public source candidates. Cryptographic signature verification is required; this is not an infrastructure inventory."
+}
