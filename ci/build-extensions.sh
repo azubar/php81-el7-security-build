@@ -30,7 +30,7 @@ for f in core/*.rpm; do
   { echo "PACKAGE $name"; rpm -qpl "$f"; } >> result/core-all-filelists.txt
   { echo "PACKAGE $name"; rpm -qp --scripts "$f"; } >> result/core-all-scriptlets.txt
   case "$release" in *cve20261022.2) ;; *) echo 'Unexpected core release'; exit 1;; esac
-  case "$name" in php|php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
+  case "$name" in php|php-sodium|php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
 done
 test "${#selected[@]}" -ge 6
 yum -y --disablerepo='*' --enablerepo='build-*' localinstall "${selected[@]}"
