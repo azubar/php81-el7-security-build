@@ -169,3 +169,4 @@ jobs:
 # Retry with explicit NTS OPcache selection in the synthetic Apache test.
 # Preserve conditional Release definitions in public PECL specs.
 # Include matching SOAP and explicitly run the ZIP suite.
+# Use explicit test flags compatible with EL7 Bash 4.2.
