@@ -13,6 +13,9 @@ for f in core/*.rpm; do
   test "$(rpm -qp --qf '%{ARCH}' "$f")" != src || continue
   name=$(rpm -qp --qf '%{NAME}' "$f")
   release=$(rpm -qp --qf '%{RELEASE}' "$f")
+  { echo "PACKAGE $name"; rpm -qpR "$f"; } >> result/core-all-requires.txt
+  { echo "PACKAGE $name"; rpm -qpl "$f"; } >> result/core-all-filelists.txt
+  { echo "PACKAGE $name"; rpm -qp --scripts "$f"; } >> result/core-all-scriptlets.txt
   case "$release" in *cve20261022.2) ;; *) echo 'Unexpected core release'; exit 1;; esac
   case "$name" in php|php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
 done
