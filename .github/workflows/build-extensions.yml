@@ -170,3 +170,4 @@ jobs:
 # Preserve conditional Release definitions in public PECL specs.
 # Include matching SOAP and explicitly run the ZIP suite.
 # Use explicit test flags compatible with EL7 Bash 4.2.
+# Batch all dependencies before compilation, then verify the complete module set together.
