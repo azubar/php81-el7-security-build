@@ -55,3 +55,16 @@ and run non-root synthetic tests in disposable EL7 containers.
 This experiment targets the two stated CVEs. It does not claim to fix all other
 vulnerabilities accumulated since PHP 8.1.18, maintain EL7, or provide ongoing
 vendor security support. A successful build is not production acceptance.
+
+## Completed experimental build
+
+- [Core build and retained outputs](https://github.com/azubar/php81-el7-security-build/actions/runs/39682743946): source RPM plus 32 binary packages, release `1.el7.remi.cve20261022.2`.
+- [Complete batched extension build](https://github.com/azubar/php81-el7-security-build/actions/runs/39687321079): all seven source packages compiled, with dependencies resolved together before compilation.
+- Both draft releases retain checksums, build logs and explicit experimental notices.
+- Combined synthetic CLI and Apache prefork/NTS checks pass with the required modules, active OPcache, APCu storage, session persistence and ordinary upload. Xdebug is excluded from the combined application configuration.
+- ZIP tests include the official test-only libzip 1.10 adaptation [b972af9](https://github.com/php/php-src/commit/b972af95894b5d869f3a0ef464c0d71951c7e8cb). No ZIP C implementation was changed.
+
+Draft tags are output metadata. The exact build source SHA is recorded in release notes.
+These are unsigned local experimental rebuilds, not Remi-supported releases.
+The original recipe's test exclusions and conditional skips remain coverage limitations.
+No application compatibility, complete historical CVE coverage, ongoing LTS support or production acceptance is claimed.
