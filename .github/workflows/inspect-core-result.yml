@@ -1,0 +1,30 @@
+name: Inspect successful core report
+on:
+  push:
+    paths: ['.github/workflows/inspect-core-result.yml']
+permissions:
+  contents: write
+jobs:
+  inspect:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Authenticate retained diagnostics and print regression summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir result
+          gh release download experiment-39682743946-1 --dir result --pattern rpmbuild.log --pattern SHA256SUMS --pattern status.txt --pattern candidate-rpm-inventory.txt
+          (cd result && sha256sum --ignore-missing -c SHA256SUMS)
+          cat result/status.txt
+          python3 - <<'PY'
+          import re
+          s=open('result/rpmbuild.log').read()
+          s=re.sub(r'\x1b\[[0-9;]*[A-Za-z]','',s)
+          p=s.rfind('Number of tests')
+          print(s[p:p+7500])
+          PY
+          cat result/candidate-rpm-inventory.txt
