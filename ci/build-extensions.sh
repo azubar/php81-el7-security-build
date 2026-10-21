@@ -10,10 +10,11 @@ grep -qx 'RPMBUILD_EXIT_STATUS=0' core/status.txt
 (cd core && sha256sum --ignore-missing -c SHA256SUMS)
 selected=()
 for f in core/*.rpm; do
+  test "$(rpm -qp --qf '%{ARCH}' "$f")" != src || continue
   name=$(rpm -qp --qf '%{NAME}' "$f")
   release=$(rpm -qp --qf '%{RELEASE}' "$f")
   case "$release" in *cve20261022.2) ;; *) echo 'Unexpected core release'; exit 1;; esac
-  case "$name" in php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
+  case "$name" in php|php-common|php-cli|php-devel|php-xml|php-mbstring|php-process|php-zts|php-pdo|php-opcache) selected+=("$f");; esac
 done
 test "${#selected[@]}" -ge 6
 yum -y --disablerepo='*' --enablerepo='build-*' localinstall "${selected[@]}"
@@ -22,6 +23,7 @@ php -n -v | tee result/patched-cli-version.txt
 php-config --vernum | tee result/patched-sdk-version.txt
 rpm --import /work/keys/remi2021.asc /work/keys/remi2022.asc /work/keys/remi2023.asc
 useradd --create-home builder
+bash /work/synthetic-apache-smoke.sh
 python - <<'PY'
 import hashlib,json,subprocess,re
 m=json.load(open('/work/public-pecl-sources.json'))
