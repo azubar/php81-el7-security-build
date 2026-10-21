@@ -1,0 +1,152 @@
+name: Rebuild extensions against patched EL7 SDK
+
+on:
+  workflow_run:
+    workflows: ['Build experimental PHP 8.1 EL7 candidate']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: isolated-public-el7-extensions
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.event.repository.private == false && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Fetch public inputs only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_OS" = Linux
+          test "$RUNNER_ARCH" = X64
+          curl -q -fsSL --connect-timeout 10 --max-time 30 \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY" \
+            | python3 -c 'import json,sys; assert json.load(sys.stdin)["private"] is False'
+          work="$RUNNER_TEMP/public-el7-preflight"
+          mkdir -p "$work/keys"
+          touch "$work/EXTERNAL_CI_ONLY"
+          curl -q -fsSL --retry 2 --connect-timeout 10 --max-time 180 --max-filesize 16777216 \
+            https://mirror.speedpartner.de/remi-archive/SRPMS/php-8.1.18-1.remi.src.rpm \
+            -o "$work/source.src.rpm"
+          (cd "$work" && echo '28d03372c3cf8c8990a076bd63100319060e7a7eac44edf114c1a09501cc4c42  source.src.rpm' | sha256sum -c -)
+          curl -q -fsSL --connect-timeout 10 --max-time 60 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/ci/el7-preflight.sh" \
+            -o "$work/preflight.sh"
+          curl -q -fsSL --connect-timeout 10 --max-time 60 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/patches/php-8.1.18-context-adaptation.patch" \
+            -o "$work/security-backport.patch"
+          curl -q -fsSL --connect-timeout 10 --max-time 60 \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/ci/build-extensions.sh" \
+            -o "$work/build-extensions.sh"
+          sha256sum "$work/preflight.sh" "$work/security-backport.patch" "$work/build-extensions.sh"
+
+      - name: Obtain only the successful experimental core and public source manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CORE_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/public-el7-preflight"
+          mkdir -p "$work/core"
+          gh release download "experiment-$CORE_RUN-1" --repo "$GITHUB_REPOSITORY" --dir "$work/core" --pattern '*.rpm' --pattern SHA256SUMS --pattern status.txt
+          curl -q -fsSL --max-time 60 "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$GITHUB_SHA/ci/public-pecl-sources.json" -o "$work/public-pecl-sources.json"
+          python3 - "$work/keys" <<'PY'
+          import pathlib,subprocess,sys
+          expected={"2021":"B1ABF71E14C9D74897E198A8B19527F1478F8947","2022":"845160D23149DAD504F0A32D83C0639E1FEF0014","2023":"50A5E157DFE548EC7C05E9D8D5933DAB6DEFD35E"}
+          for year,want in expected.items():
+              p=str(pathlib.Path(sys.argv[1])/("remi"+year+".asc"))
+              subprocess.run(["curl","-q","-fsSL","--max-time","60","https://raw.githubusercontent.com/rpm-software-management/distribution-gpg-keys/main/keys/remi/RPM-GPG-KEY-remi"+year,"-o",p],check=True)
+              s=subprocess.check_output(["gpg","--batch","--show-keys","--with-colons",p],text=True)
+              assert next(l.split(":")[9] for l in s.splitlines() if l.startswith("fpr:"))==want
+          PY
+
+      - name: Pin official CentOS 7 amd64 image and validate public signing keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/public-el7-preflight"
+          image='docker.io/library/centos@sha256:dead07b4d8ed7e29e98de0f4504d87e8880d4347859d839686a31da35a3b532f'
+          docker pull --platform linux/amd64 "$image"
+          docker image inspect "$image" --format '{{json .RepoDigests}}'
+          docker run --rm --platform linux/amd64 "$image" \
+            cat /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7 > "$work/keys/centos.asc"
+          curl -q -fsSL --connect-timeout 10 --max-time 60 \
+            https://raw.githubusercontent.com/rpm-software-management/distribution-gpg-keys/main/keys/epel/RPM-GPG-KEY-EPEL-7 \
+            -o "$work/keys/epel.asc"
+          curl -q -fsSL --connect-timeout 10 --max-time 60 \
+            https://mirror.speedpartner.de/remi/enterprise/7/RPM-GPG-KEY-remi \
+            -o "$work/keys/remi.asc"
+          python3 - "$work/keys" <<'PY'
+          import pathlib,subprocess,sys
+          expected={
+              "centos.asc":"6341AB2753D78A78A7C27BB124C6A8A7F4A80EB5",
+              "epel.asc":"91E97D7C4A5E96F17F3E888F6A2FAEA2352C64E5",
+              "remi.asc":"1EE04CCE88A4AE4AA29A5DF5004E6F4700F97F56",
+          }
+          for name,want in expected.items():
+              data=subprocess.check_output(["gpg","--batch","--show-keys","--with-colons",str(pathlib.Path(sys.argv[1])/name)],text=True)
+              got=next(line.split(":")[9] for line in data.splitlines() if line.startswith("fpr:"))
+              assert got==want,(name,got,want)
+              print(name,got,"fingerprint OK")
+          PY
+
+      - name: Build and test in the isolated EL7 container
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/public-el7-preflight"
+          image='docker.io/library/centos@sha256:dead07b4d8ed7e29e98de0f4504d87e8880d4347859d839686a31da35a3b532f'
+          docker run --rm --platform linux/amd64 \
+            --env EXTERNAL_CI=1 \
+            --mount "type=bind,src=$work,dst=/work" \
+            --workdir /work "$image" /bin/bash --noprofile --norc -c \
+            'bash /work/preflight.sh && bash /work/build-extensions.sh'
+
+      - name: Retain experiment output as a draft release without Actions artifact storage
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          result="$RUNNER_TEMP/public-el7-preflight/result"
+          if test ! -f "$result/ACCEPTANCE.txt"; then
+            echo 'No completed build report; no candidate is retained.'
+            exit 0
+          fi
+          tag="extensions-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          notes="$RUNNER_TEMP/experiment-notes.txt"
+          {
+            echo 'EXPERIMENTAL / NOT APPROVED FOR PRODUCTION'
+            echo ''
+            cat "$result/status.txt" "$result/ACCEPTANCE.txt"
+            echo ''
+            echo "Source commit: $GITHUB_SHA"
+            echo "Workflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo 'Draft only; no release publication, production deployment, paid runner, or Actions artifact storage.'
+          } > "$notes"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --draft --prerelease \
+            --title "Experimental PHP 8.1 EL7 result $GITHUB_RUN_ID" \
+            --notes-file "$notes" "$result"/*
+          echo "Draft experiment tag: $tag"
+
+      - name: State the remaining acceptance gates
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## External EL7 source preparation'
+            echo ''
+            echo 'This is a disposable external container on a standard public runner.'
+            echo 'No source or dependency was taken from a production server.'
+            echo 'No paid runner, Actions artifact storage, deployment, or production credential is used.'
+            echo 'A passing candidate build is not application compatibility, full security acceptance, or deployment approval.'
+            echo 'The generic unsigned SRPM is still not proven to be the exact original EL7 source.'
+          } >> "$GITHUB_STEP_SUMMARY"
