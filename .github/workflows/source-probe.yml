@@ -1,0 +1,127 @@
+name: Inspect public PHP 8.1.18 source
+
+on:
+  push:
+    paths:
+      - .github/workflows/source-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-php81-source-probe
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Require a public repository and standard Linux x64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_OS" = Linux
+          test "$RUNNER_ARCH" = X64
+          curl -q -fsSL --connect-timeout 10 --max-time 30 \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY" \
+            | python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["private"] is False'
+          echo "This job has no production access and uploads no artifacts."
+
+      - name: Install inspection tools on the disposable external runner
+        shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends rpm rpm2cpio cpio curl xz-utils
+
+      - name: Fetch and pin the public source candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          mkdir source-probe
+          cd source-probe
+          curl -q -fSL --retry 2 --connect-timeout 10 --max-time 180 \
+            --max-filesize 16777216 \
+            https://mirror.speedpartner.de/remi-archive/SRPMS/php-8.1.18-1.remi.src.rpm \
+            -o source.src.rpm
+          echo '28d03372c3cf8c8990a076bd63100319060e7a7eac44edf114c1a09501cc4c42  source.src.rpm' \
+            | sha256sum -c -
+          test "$(rpm -qp --qf '%{NAME}|%{VERSION}|%{RELEASE}' source.src.rpm)" = 'php|8.1.18|1.remi'
+          rpm -Kv source.src.rpm
+          rpm -qp --qf 'Name=%{NAME}\nVersion=%{VERSION}\nRelease=%{RELEASE}\nArch=%{ARCH}\n' source.src.rpm
+          echo 'Digest verification alone does not authenticate an unsigned SRPM.'
+          rpm -qp --requires source.src.rpm > build-requires.raw.txt
+          cat build-requires.raw.txt
+
+      - name: Inspect only flat regular source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/source-probe"
+          rpm2cpio source.src.rpm | cpio -it --quiet > member-names.txt
+          python3 - <<'PY'
+          import pathlib,re
+          names=pathlib.Path("member-names.txt").read_text().splitlines()
+          assert len(names)==34, names
+          assert all(re.fullmatch(r"[A-Za-z0-9_.+-]+", n) for n in names), names
+          assert "php81.spec" in names and "php-8.1.18.tar.xz" in names
+          PY
+          rpm2cpio source.src.rpm | cpio -itv --quiet > member-types.txt
+          if grep -v '^-' member-types.txt; then
+            echo 'Unexpected non-regular source member; refusing extraction.'
+            exit 1
+          fi
+          mkdir source
+          cd source
+          rpm2cpio ../source.src.rpm | cpio -id --no-absolute-filenames --quiet
+          sha256sum * > ../source-file-sha256.txt
+          cat ../source-file-sha256.txt
+          echo 'f3553370f8ba42729a9ce75eed17a2111d32433a43b615694f6a571b8bad0e39  php-8.1.18.tar.xz' \
+            | sha256sum -c -
+          grep -nE '^(Name:|Version:|Release:|BuildRequires:|Patch[0-9]*:|%global upver)' php81.spec
+          if grep -n '#exit 1' php81.spec; then
+            echo 'REVIEW GATE: the original spec may suppress test failures.'
+          fi
+          echo 'No SRPM macros, build steps, scriptlets, or PHP have been executed.'
+
+      - name: Try independent official recipe corroboration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/source-probe"
+          found=0
+          for url in \
+            'https://git.remirepo.net/cgit/rpms/php/php81.git/plain/php81.spec?h=v8.1.18' \
+            'https://git.remirepo.net/git/rpms/php/php81.git/plain/php81.spec?h=v8.1.18'
+          do
+            if curl -q -fsSL --connect-timeout 8 --max-time 25 --max-filesize 262144 \
+              "$url" -o official.spec && cmp -s source/php81.spec official.spec
+            then
+              echo "Exact spec bytes corroborated at: $url"
+              found=1
+              break
+            fi
+          done
+          if test "$found" -eq 0; then
+            echo 'PROVENANCE GATE REMAINS CLOSED: exact official spec not corroborated.'
+          fi
+
+      - name: Report inspection status without publishing a build
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '## Public source inspection only'
+            echo ''
+            echo '- No PHP build or deployment was performed.'
+            echo '- The upstream tarball must match the SHA256 published by php.net.'
+            echo '- The generic unsigned SRPM is not automatically an authenticated exact EL7 source.'
+            echo '- Packaging provenance, full EL7 BuildRequires, patch adaptation, and regression gates remain separate.'
+            echo '- Standard public Linux runner only; no uploaded artifacts or paid runner services.'
+          } >> "$GITHUB_STEP_SUMMARY"
